@@ -1,0 +1,29 @@
+@startuml
+Reproductor "1" *-- "1" MusicComponent
+MusicComponent <|-- Song
+MusicComponent <|-- PlayList
+PlayList "1" o-- "0..*" MusicComponent 
+
+abstract class MusicComponent{
+- name: str
++ play(): void
++ stop(): void'
++ get_length(): float
++ show(): void
+}
+class Song{
+}
+
+class PlayList{
++ Add(element: MusicComponent): void
++ remove_element(element: MusicComponent): void
+
+}
+
+class Reproductor{
+- main_list: MusicComponent
++ play(): void
++ stop(): void
++ 
+}
+@enduml
