@@ -1,0 +1,44 @@
+Caso 1:
+@startuml
+
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+
+Usuari -> V : Selecciona cançó (.mp3)
+V -> C : add(song: Song)
+C -> R : add(song)
+R -> PL : Add(song)
+@enduml
+
+Caso 2:
+@startuml
+
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+
+Usuari -> V : Selecciona llista (.m3u)
+V -> C : add(playlist: PlayList)
+C -> R : add(playlist)
+R -> PL : Add(playlist)
+@enduml
+
+Caso 3:
+@startuml
+
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+
+Usuari -> V : Selecciona element a eliminar
+V -> C : remove(element: MusicComponent)
+C -> R : remove(element)
+R -> PL : remove_element(element)
+@enduml
