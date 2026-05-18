@@ -2,28 +2,62 @@
 Reproductor "1" *-- "1" MusicComponent
 MusicComponent <|-- Song
 MusicComponent <|-- PlayList
-PlayList "1" o-- "0..*" MusicComponent 
+PlayList "1" o-- "0..*" MusicComponent
+Reproductor "1" -- "1" Controller
+Controller "1" -- "1" View
+
+class Controller{
++ show_reproductor(): void
++ play(): void
++ stop(): void
++ add(element: MusicComponent): void
++ remove(element: MusicComponent): void
++ exit(): void
+}
+
+class View{
++ show_reproductor(): void
++ show_dir(): void
++ play(): void
++ stop(): void
++ add(element: MusicComponent): void
++ remove(element: MusicComponent): void
++ create_PlayList(): void
++ exit(): void
+}
 
 abstract class MusicComponent{
 - name: str
 + play(): void
-+ stop(): void'
++ stop(): void
 + get_length(): float
++ get_name(): str
 + show(): void
 }
 class Song{
+- name: str
++ show(): void
++ play(): void
++ stop(): void
++ get_length(): float
 }
 
 class PlayList{
+- name: str
++ show(): void
 + Add(element: MusicComponent): void
 + remove_element(element: MusicComponent): void
-
++ save_to_file(): void
++ get_length(): float
 }
 
 class Reproductor{
 - main_list: MusicComponent
 + play(): void
 + stop(): void
-+ 
++ add(element: MusicComponent): void
++ remove(element: MusicComponent): void
++ save_state(): void
++ update_state(): void
 }
 @enduml
