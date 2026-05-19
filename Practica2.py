@@ -16,7 +16,7 @@ pygame.mixer.init()
 
 class MusicComponent(ABC):
     def __init__(self, name):
-        self.name = name
+        self._name = name
 
     @abstractmethod
     def play(self):
@@ -39,71 +39,79 @@ class MusicComponent(ABC):
         pass
 
 class Song(MusicComponent):
+    def __init__(self, name):
+        super().__init__(name)
+
     def play(self):
-        path = os.path.join(MUSIC_DIR, self.name)
+        path = os.path.join(MUSIC_DIR, self._name)
         if os.path.exists(path):
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
         else:
-            print(f"Error: No s'ha trobat el fitxer {self.name}")
+            print(f"Error: No s'ha trobat el fitxer {self._name}")
 
     def stop(self):
         pygame.mixer.music.stop()
 
     def show(self):
-        print(f"Cançó: {self.name}")
+        print(f"Cançó: {self._name}")
 
     def get_elements(self):
-        return [self.name]
+        return [self._name]
 
 class PlayList(MusicComponent):
     def __init__(self, name):
         super().__init__(name)
-        self.components = []
+        self._components = []
 
     def Add(self, element: MusicComponent):
-        self.components.append(element)
+        self._components.append(element)
 
     def remove_element(self, element: MusicComponent):
-        if element in self.components:
-            self.components.remove(element)
+        if element in self._components:
+            self._components.remove(element)
 
     def show(self):
-        print(f"Llista de reproducció: {self.name}")
-        for comp in self.components:
+        print(f"{self._name}")
+        for comp in self._components:
+            print("\t", end=" ")
             comp.show()
 
     def save_to_file(self):
-        path = os.path.join(MUSIC_DIR, self.name)
+        path = os.path.join(MUSIC_DIR, self._name)
         with open(path, 'w') as f:
-            for comp in self.components:
+            for comp in self._components:
                 f.write(comp.name + '\n')
 
     def get_elements(self):
         elements = []
-        for comp in self.components:
+        for comp in self._components:
             elements.extend(comp.get_elements())
         return elements
 
+    @property
+    def components(self):
+        return self._components
+
 class Reproductor:
     def __init__(self):
-        self.main_list = PlayList("MainList")
+        self._main_list = PlayList("MainList")
         self.update_state()
 
     def add(self, element: MusicComponent):
-        self.main_list.Add(element)
+        self._main_list.Add(element)
 
     def remove(self, element: MusicComponent):
-        self.main_list.remove_element(element)
+        self._main_list.remove_element(element)
 
     def get_all_songs_to_play(self):
-        return self.main_list.get_elements()
+        return self._main_list.get_elements()
 
     def stop(self):
         pygame.mixer.music.stop()
 
     def save_state(self):
-        elements_names = [comp.name for comp in self.main_list.components]
+        elements_names = [comp.name for comp in self._main_list.components]
         with open(STATE_FILE, 'w') as f:
             json.dump(elements_names, f)
 
@@ -303,4 +311,3 @@ if __name__ == "__main__":
     
     root.protocol("WM_DELETE_WINDOW", view.exit)
     root.mainloop()
-# cambios
