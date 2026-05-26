@@ -83,6 +83,10 @@ class Song(MusicComponent):
     @property
     def file_name(self)->str:
         return '.'.join([self._name, 'mp3'])
+class PlayStrategy(ABC):
+    @abstractmethod
+    def order(self, elements:list)->list:
+        pass
 
 class PlayList(MusicComponent):
     # Creem un esdeveniment per quan una canco acaba
@@ -136,9 +140,12 @@ class PlayList(MusicComponent):
 
     def song_ended(self):
         while self._reproduint:
-            event = pygame.event.wait()
-            if event.type == self._FINAL_CANCO:
-                self.next()
+            try:
+                event = pygame.event.wait()
+                if event.type == self._FINAL_CANCO and self._reproduint:
+                    self.next()
+            except pygame.error:
+                break
 
     def next(self)->None:
         if pygame.mixer.music.get_busy():
@@ -294,6 +301,15 @@ class Reproductor:
     @property
     def elements(self)->list:
         return self._main_list.elements
+    
+    def set_strategy(self, strategy_type: str) -> None:
+        if strategy_type == "Secuencial":
+            self._main_list.set_strategy(sequentialPlayStrategy())
+        elif strategy_type == "Aleatoria":
+            self._main_list.set_strategy(randomPlayStrategy())
+        elif strategy_type == "Mes curtes primer":
+            self._main_list.set_strategy(ShortestFirstPlayStrategy())
+
 class Controller:
     def __init__(self, reproductor, view)->None:
         self._reproductor = reproductor
@@ -348,15 +364,15 @@ class Controller:
     def exit(self):
         self.stop()
         self._reproductor.save_state()
+    
+    def set_strategy(self, strategy_type: str) -> None:
+        self._reproductor.set_strategy(strategy_type)
 
     @property
     def elements_llista_reproductor(self):
         return self._reproductor.elements_llista
 
-class PlayStrategy(ABC):
-    @abstractmethod
-    def order(self, elements:list)->list:
-        pass
+
 
 class sequentialPlayStrategy(PlayStrategy):
     def order(self, elements:list)->list:
@@ -390,7 +406,20 @@ class View:
         tk.Label(frame_rep, text="Cua de Reproducció:").pack()
         self._listbox_rep = tk.Listbox(frame_rep)
         self._listbox_rep.pack(fill=tk.BOTH, expand=True)
+        
+        frame_strategy = tk.Frame(self._root)
+        frame_strategy.pack(fill=tk.X, pady=5)
+        
+        tk.Label(frame_strategy, text="Estratègia de Reproducció:").pack(side=tk.LEFT, padx=5)
+        
+        self.strategy_var = tk.StringVar(self._root)
+        self.strategy_var.set("Secuencial") 
+        
+        opciones_estrategia = ["Secuencial", "Aleatoria", "Mes curtes primer"]
+        strategy_menu = tk.OptionMenu(frame_strategy, self.strategy_var, *opciones_estrategia, command=self.change_strategy)
+        strategy_menu.pack(side=tk.LEFT, padx=5)
 
+        
         frame_btns = tk.Frame(self._root)
         frame_btns.pack(fill=tk.X, pady=10)
 
@@ -398,9 +427,9 @@ class View:
         tk.Button(frame_btns, text="3. Eliminar del Reproductor", command=self.remove).grid(row=0, column=1, padx=5, pady=5)
         tk.Button(frame_btns, text="4. Crear Llista (.m3u)", command=self.create_playlist).grid(row=1, column=0, padx=5, pady=5)
         tk.Button(frame_btns, text="5. Play", command=self.play, bg="lightgreen").grid(row=2, column=0, padx=5, pady=5)
-        tk.Button(frame_btns, text="Stop", command=self.stop, bg="lightcoral").grid(row=2, column=1, padx=5, pady=5)
-        tk.Button(frame_btns, text="Pausa", command=self.pause).grid(row=3, column=0, padx=5, pady=5)
-        tk.Button(frame_btns, text="Resume", command=self.resume).grid(row=3, column=1, padx=5, pady=5)
+        tk.Button(frame_btns, text="Atura reproduccio", command=self.stop, bg="lightcoral").grid(row=2, column=1, padx=5, pady=5)
+        tk.Button(frame_btns, text="Pausa canço", command=self.pause).grid(row=3, column=0, padx=5, pady=5)
+        tk.Button(frame_btns, text="Continua canço", command=self.resume).grid(row=3, column=1, padx=5, pady=5)
         tk.Button(frame_btns, text="Seguent", command=self.next).grid(row=4, column=0, padx=5, pady=5)
         tk.Button(frame_btns, text="Anterior", command=self.previous).grid(row=4, column=1, padx=5, pady=5)
         tk.Button(frame_btns, text="Sortir i Guardar Estat", command=self.exit).grid(row=5, column=0, padx=5, pady=5)
@@ -468,7 +497,9 @@ class View:
     def exit(self)->None:
         self._root.destroy()
         self._controller.exit()
-
+    
+    def change_strategy(self, selected_strategy: str) -> None:
+        self._controller.set_strategy(selected_strategy)
 if __name__ == "__main__":
     root = tk.Tk()
     reproductor = Reproductor()
@@ -476,3 +507,40 @@ if __name__ == "__main__":
     
     root.protocol("WM_DELETE_WINDOW", view.exit)
     root.mainloop()
+    
+   # Exercici 3
+    
+    # a) Llista senars.m3u amb estratègia més curtes primer
+
+    llista_senars = PlayList("senars")
+    llista_senars.set_strategy(ShortestFirstPlayStrategy())
+    for nom_song in ["Song01", "Song03", "Song05", "Song07"]:
+        llista_senars.Add(Song(nom_song))
+    llista_senars.save_to_file()
+
+    # b1) Reproduir Song02, Song04 i senars.m3u seqüencialment
+    reproductor.set_strategy("Secuencial")
+    
+    song2 = Song("Song02")
+    song4 = Song("Song04") 
+    
+    reproductor.add(song2)
+    reproductor.add(song4)
+    reproductor.add(llista_senars)
+    
+    reproductor.play()
+    
+    # Imprimim l'ordre abans del canvi
+    ordre_inicial = [song.name for song in reproductor._main_list._a_reproduir]
+    print(f"Ordre Seqüencial inicial: {ordre_inicial}")
+    
+    # b2) Canviar a estratègia aleatòria un cop començat
+    reproductor.set_strategy("Aleatoria")
+    
+    # c) Eliminar la cançó Song04 de la llista
+    reproductor.remove(song4)
+    
+    # Ordre després d'eliminar la canço
+    ordre_final = [song.name for song in reproductor._main_list._a_reproduir]
+    print(f"Ordre després d'esborrar i passar a Aleatòria: {ordre_final}")
+     
