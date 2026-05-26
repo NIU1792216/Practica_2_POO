@@ -104,7 +104,7 @@ class PlayList(MusicComponent):
         # Index de la canco que s'esta reproduint (a self._a_reproduir)
         self._index_reproduint = 0
         # Estrategia por defecto (secuencial)
-        self._strategy = sequentialPlayStrategy()
+        self._strategy = SequentialPlayStrategy()
 
     def play(self)->None:
         # Si ja estem reproduint no fem res
@@ -304,7 +304,7 @@ class Reproductor:
     
     def set_strategy(self, strategy_type: str) -> None:
         if strategy_type == "Secuencial":
-            self._main_list.set_strategy(sequentialPlayStrategy())
+            self._main_list.set_strategy(SequentialPlayStrategy())
         elif strategy_type == "Aleatoria":
             self._main_list.set_strategy(randomPlayStrategy())
         elif strategy_type == "Mes curtes primer":
@@ -374,7 +374,7 @@ class Controller:
 
 
 
-class sequentialPlayStrategy(PlayStrategy):
+class SequentialPlayStrategy(PlayStrategy):
     def order(self, elements:list)->list:
         return elements
     

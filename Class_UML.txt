@@ -1,5 +1,5 @@
 @startuml
-Reproductor "1" *-- "1" MusicComponent
+Reproductor "1" *-- "1" Playlist
 MusicComponent <|-- Song
 MusicComponent <|-- PlayList
 PlayList "1" o-- "0..*" MusicComponent
@@ -11,8 +11,8 @@ PlayStrategy <|-- randomPlayStrategy
 PlayStrategy <|-- ShortestFirstPlayStrategy
 
 class Controller{
-- _reproductor: Reproductor
-- _view: View
+- reproductor: Reproductor
+- view: View
 + add_song(song_name: str): void
 + add_playlist(playlist_name: str): void
 + remove_element(index: int): void
@@ -29,7 +29,7 @@ class Controller{
 }
 
 class View{
-- _controller: Controller
+- controller: Controller
 + show_dir(): void
 + show_reproductor(): void
 + add(): void
@@ -46,7 +46,7 @@ class View{
 }
 
 abstract class MusicComponent{
-- _name: str
+- name: str
 + play(): void
 + stop(): void
 + show(): void
@@ -56,7 +56,7 @@ abstract class MusicComponent{
 }
 
 class Song{
-- _name: str
+- name: str
 + play(): void
 + stop(): void
 + show(): void
@@ -67,9 +67,13 @@ class Song{
 }
 
 class PlayList{
-- _name: str
-- _elements: list
-- _strategy: PlayStrategy
+- name: str
+- elements: list
+- strategy: PlayStrategy
+- a_reproduir: list
+- reproduint: bool
+- pausat: bool
+- index_reproduint: int
 + play(): void
 + stop(): void 
 + pause(): void
@@ -91,7 +95,7 @@ class PlayList{
 }
 
 class Reproductor{
-- _main_list: PlayList
+- main_list: PlayList
 + play(): void
 + stop(): void
 + pause(): void
@@ -113,7 +117,7 @@ abstract class PlayStrategy{
 + order(elements: list): list
 }
 
-class sequentialPlayStrategy {
+class SequentialPlayStrategy {
 + order(elements: list): list
 }
 
