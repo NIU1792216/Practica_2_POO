@@ -1,6 +1,5 @@
 # Practica 2
 import os
-os.environ['SDL_AUDIODRIVER'] = 'dummy'
 import json
 import tkinter as tk
 from tkinter import messagebox, simpledialog
@@ -14,8 +13,10 @@ STATE_FILE = "state.json"
 if not os.path.exists(MUSIC_DIR):
     os.makedirs(MUSIC_DIR)
 
+# Activem la part de so
 pygame.mixer.init()
-
+# Activem la part que permet utilitzar esdeveniments
+pygame.display.init()
 
 class MusicComponent(ABC):
     def __init__(self, name:str):
@@ -54,16 +55,21 @@ class Song(MusicComponent):
         else:
             print(f"Error: No s'ha trobat el fitxer {nom_arxiu}")
             raise NotADirectoryError
+        
     def stop(self)->None:
         pygame.mixer.music.stop()
+
     def show(self)->None:
         print(f"{self._name}")
+    @property
+    def name(self)->str:
+        return self._name
     @property
     def length(self)->float:
         return 1.0
     @property
     def elements(self):
-        return [self._name]
+        return [self]
     @property
     def file_name(self)->str:
         return '.'.join([self._name, 'mp3'])
@@ -75,7 +81,7 @@ class PlayList(MusicComponent):
 
     def __init__(self, name:str):
         super().__init__(name)
-        self._components = []
+        self._elements = []
         # Llista de totes les cancos dintre la playlist (descomposant les altres playlist)
         self._a_reproduir = []
         # Indicadors de l'estat de la playlist
@@ -91,7 +97,7 @@ class PlayList(MusicComponent):
             self.resume()
             return
         # Obtenim una llista amb totes les cancons a reproduir
-        self._a_reproduir = self.components
+        self._a_reproduir = self.elements
         if not self._a_reproduir:
             print("La llista es buida")
             return
@@ -144,48 +150,44 @@ class PlayList(MusicComponent):
         self._pausat = False
 
     def Add(self, element: MusicComponent):
-        self._components.append(element)
+        self._elements.append(element)
 
     def remove_element(self, element: MusicComponent):
-        if element in self._components:
-            self._components.remove(element)
+        if element in self._elements:
+            self._elements.remove(element)
         
     def show(self):
         print(f"{self._name}")
-        for comp in self._components:
+        for comp in self._elements:
             print("\t", end=" ")
             comp.show()
 
     def save_to_file(self):
-        path = os.path.join(MUSIC_DIR, self._name)
+        path = os.path.join(MUSIC_DIR, self.file_name)
         with open(path, 'w') as f:
-            for comp in self._components:
+            for comp in self._elements:
                 f.write(comp.name + '\n')
     @property
     def length(self)->float:
         suma = 0
-        for element in self.elements:
-            suma += element.length()
+        for component in self.elements:
+            suma += component.length()
         return suma
     @property
     def elements(self):
         elements = []
-        for comp in self._components:
-            elements.extend(comp.elements())
-        return elements
-    @property
-    def components(self):
-        components = []
-        for comp in self._components:
+        for comp in self._elements:
             if type(comp) == Song:
-                components.extend([comp])
+                elements.extend([comp])
             elif type(comp) == PlayList:
-                components.extend(comp.components)
-        return components
+                elements.extend(comp.elements)
+        return elements
     @property
     def file_name(self):
         return '.'.join([self._name, 'm3u'])
-
+    @property
+    def num_elements(self):
+        return len(self._elements)
 class Reproductor:
     def __init__(self):
         self._main_list = PlayList("MainList")
@@ -215,9 +217,10 @@ class Reproductor:
         self._main_list.remove_element(element)
 
     def save_state(self)->None:
-        files_names = [comp.file_name for comp in self._main_list.components]
+        files_names = [comp.file_name for comp in self._main_list.elements]
         with open(STATE_FILE, 'w') as state_file:
             json.dump(files_names, state_file)
+
     def update_state(self)->None:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, 'r') as state_file:
@@ -230,6 +233,7 @@ class Reproductor:
                             self.add(self.create_playlist_from_file(name))
                 except json.JSONDecodeError:
                     pass
+
     def create_playlist_from_file(self, filename:str)->PlayList:
         # El nom de la playlist es el nom de l'arxiu menys '.m3u'
         pl = PlayList(filename[:-4])
@@ -246,13 +250,16 @@ class Reproductor:
                     elif line[-4:] == '.m3u':
                         pl.Add(self.create_playlist_from_file(line))
         return pl
+    
     @property
-    def songs_to_play(self)->list:
+    def elements_llista(self)->list:
         return self._main_list.elements
     @property
-    def components_llista(self)->list:
-        return self._main_list.components
-
+    def num_elements(self)->int:
+        return self._main_list.num_elements
+    @property
+    def elements(self)->list:
+        return self._main_list.elements
 class Controller:
     def __init__(self, reproductor, view)->None:
         self._reproductor = reproductor
@@ -271,8 +278,8 @@ class Controller:
         self._view.show_reproductor()
 
     def remove_element(self, index)->None:
-        if 0 <= index < len(self._reproductor.main_list.components):
-            element = self._reproductor.main_list.components[index]
+        if 0 <= index < self._reproductor.num_elements:
+            element = self._reproductor.elements[index]
             self._reproductor.remove(element)
             self._view.show_reproductor()
 
@@ -307,11 +314,10 @@ class Controller:
     def exit(self):
         self.stop()
         self._reproductor.save_state()
-        self._view.destroy()
 
     @property
-    def components_llista_reproductor(self):
-        return self._reproductor.components_llista
+    def elements_llista_reproductor(self):
+        return self._reproductor.elements_llista
 
 
 class View:
@@ -327,14 +333,14 @@ class View:
         frame_dir = tk.Frame(frame_lists)
         frame_dir.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         tk.Label(frame_dir, text="Fitxers a MusicDir:").pack()
-        self.listbox_dir = tk.Listbox(frame_dir, selectmode=tk.MULTIPLE)
-        self.listbox_dir.pack(fill=tk.BOTH, expand=True)
+        self._listbox_dir = tk.Listbox(frame_dir, selectmode=tk.MULTIPLE)
+        self._listbox_dir.pack(fill=tk.BOTH, expand=True)
 
         frame_rep = tk.Frame(frame_lists)
         frame_rep.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         tk.Label(frame_rep, text="Cua de Reproducció:").pack()
-        self.listbox_rep = tk.Listbox(frame_rep)
-        self.listbox_rep.pack(fill=tk.BOTH, expand=True)
+        self._listbox_rep = tk.Listbox(frame_rep)
+        self._listbox_rep.pack(fill=tk.BOTH, expand=True)
 
         frame_btns = tk.Frame(self._root)
         frame_btns.pack(fill=tk.X, pady=10)
@@ -350,41 +356,46 @@ class View:
         tk.Button(frame_btns, text="Anterior", command=self.previous).grid(row=4, column=1, padx=5, pady=5)
         tk.Button(frame_btns, text="Sortir i Guardar Estat", command=self.exit).grid(row=5, column=0, padx=5, pady=5)
 
+        self.show_dir()
+        self.show_reproductor()
+
     def show_dir(self):
-        self.listbox_dir.delete(0, tk.END)
+        self._listbox_dir.delete(0, tk.END)
         for f in os.listdir(MUSIC_DIR):
             if f[-4:] == '.mp3' or f[-4:] == '.m3u':
-                self.listbox_dir.insert(tk.END, f)
+                self._listbox_dir.insert(tk.END, f)
 
     def show_reproductor(self):
-        self.listbox_rep.delete(0, tk.END)
-        for comp in self._controller.components_llista_reproductor:
-            self.listbox_rep.insert(tk.END, comp.name)
+        self._listbox_rep.delete(0, tk.END)
+        for comp in self._controller.elements_llista_reproductor:
+            self._listbox_rep.insert(tk.END, comp.name)
 
 
     def add(self):
-        selected_indices = self.listbox_dir.curselection()
+        selected_indices = self._listbox_dir.curselection()
         for idx in selected_indices:
-            filename = self.listbox_dir.get(idx)
+            filename = self._listbox_dir.get(idx)
             if filename.endswith('.mp3'):
-                self._controller.add_song(filename)
+                # Traiem la extensio del string obtingut
+                self._controller.add_song(filename[:-4])
             elif filename.endswith('.m3u'):
-                self._controller.add_playlist(filename)
+                # Traiem la extensio del string obtingut
+                self._controller.add_playlist(filename[:-4])
 
     def remove(self):
-        selected_indices = self.listbox_rep.curselection()
+        selected_indices = self._listbox_rep.curselection()
         if selected_indices:
             self._controller.remove_element(selected_indices[0])
 
     def create_playlist(self):
-        selected_indices = self.listbox_dir.curselection()
+        selected_indices = self._listbox_dir.curselection()
         if not selected_indices:
             messagebox.showwarning("Avís", "Selecciona fitxers del directori per afegir a la llista.")
             return
         
         name = simpledialog.askstring("Nova Llista", "Introdueix el nom de la llista :")
         if name:
-            selected_files = [self.listbox_dir.get(i) for i in selected_indices]
+            selected_files = [self._listbox_dir.get(i)[:-4] for i in selected_indices]
             self._controller.create_playlist(name, selected_files)
 
     def play(self)->None:
@@ -406,10 +417,8 @@ class View:
         self._controller.previous()
 
     def exit(self)->None:
-        self._controller.exit()
-    
-    def destroy(self)->None:
         self._root.destroy()
+        self._controller.exit()
 
 if __name__ == "__main__":
     root = tk.Tk()
