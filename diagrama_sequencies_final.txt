@@ -1,0 +1,123 @@
+Caso 1:
+@startuml
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+participant "strategy: PlayStrategy" as Strat
+
+Usuari -> V : Selecciona cançó (.mp3) i clica Afegir
+V -> C : add_song(song_name)
+create participant "s: Song" as S
+C -> S : <<create>>
+C -> R : add(s)
+R -> PL : Add(s)
+PL -> PL : elements.append(s)
+
+opt a_reproduir no està buit
+    PL -> PL : get_all_songs()
+    PL -> Strat : order(elements)
+    Strat --> PL : elements_ordenats
+end
+@enduml
+
+Caso 2:
+@startuml
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+participant "strategy: PlayStrategy" as Strat
+
+Usuari -> V : Selecciona llista (.m3u) i clica Afegir
+V -> C : add_playlist(playlist_name)
+C -> R : create_playlist_from_file(playlist_name)
+create participant "pl: PlayList" as NPL
+R -> NPL : <<create>>
+R --> C : pl
+C -> R : add(pl)
+R -> PL : Add(pl)
+PL -> PL : elements.append(pl)
+
+opt a_reproduir no està buit
+    PL -> PL : get_all_songs()
+    PL -> Strat : order(elements)
+    Strat --> PL : elements_ordenats
+end
+@enduml
+
+Caso 3:
+@startuml
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+participant "strategy: PlayStrategy" as Strat
+
+Usuari -> V : Selecciona element i clica Eliminar
+V -> C : remove_element(index)
+C -> R : remove(element)
+R -> PL : remove_element(element)
+PL -> PL : elements.remove(element)
+
+opt a_reproduir no està buit
+    PL -> PL : get_all_songs()
+    PL -> Strat : order(elements)
+    Strat --> PL : elements_ordenats
+end
+@enduml
+
+Caso 4:
+@startuml
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "new_pl: PlayList" as NPL
+
+Usuari -> V : Clica Crear Llista i introdueix nom
+V -> C : create_playlist(name, selected_files)
+create NPL
+C -> NPL : <<create>>(name)
+
+loop per cada fitxer seleccionat
+    alt fitxer .mp3
+        create participant "s: Song" as S
+        C -> S : <<create>>
+        C -> NPL : Add(s)
+    else fitxer .m3u
+        C -> R : create_playlist_from_file(fitxer)
+        R --> C : playlist_retornada 
+        C -> NPL : Add(playlist_retornada)
+    end
+end
+
+C -> NPL : save_to_file()
+V <-- C
+V -> V : show_dir()
+@enduml
+
+Caso 5:
+@startuml
+actor Usuari
+participant "View" as V
+participant "Controller" as C
+participant "Reproductor" as R
+participant "main_list: PlayList" as PL
+participant "strategy: PlayStrategy" as Strat
+participant "first_song: Song" as S
+
+Usuari -> V : Clica Play
+V -> C : play()
+C -> R : play()
+R -> PL : play()
+
+PL -> PL : get_all_songs()
+PL -> Strat : order(elements)
+Strat --> PL : elements_ordenats
+
+PL -> S : play()
+@enduml
