@@ -9,7 +9,11 @@ Controller "1" -- "1" View
 class Controller{
 + show_reproductor(): void
 + play(): void
-+ stop(): void
++ stop(): void 
++ pause(): void
++ resume(): void
++ next(): void
++ previous(): void
 + add(element: MusicComponent): void
 + remove(element: MusicComponent): void
 + exit(): void
@@ -19,7 +23,11 @@ class View{
 + show_reproductor(): void
 + show_dir(): void
 + play(): void
-+ stop(): void
++ stop(): void 
++ pause(): void
++ resume(): void
++ next(): void
++ previous(): void
 + add(element: MusicComponent): void
 + remove(element: MusicComponent): void
 + create_PlayList(): void
@@ -32,14 +40,17 @@ abstract class MusicComponent{
 + stop(): void
 + get_length(): float
 + get_name(): str
++ get_file_name(): str
 + show(): void
 }
+
 class Song{
 - name: str
 + show(): void
 + play(): void
 + stop(): void
 + get_length(): float
++ get_file_name(): str
 }
 
 class PlayList{
@@ -47,8 +58,16 @@ class PlayList{
 + show(): void
 + Add(element: MusicComponent): void
 + remove_element(element: MusicComponent): void
++ play(): void
++ stop(): void 
++ pause(): void
++ resume(): void
++ next(): void
++ previous(): void
++ song_ended(): void
 + save_to_file(): void
 + get_length(): float
++ get_file_name(): str
 }
 
 class Reproductor{

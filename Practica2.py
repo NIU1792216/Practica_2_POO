@@ -1,10 +1,12 @@
 # Practica 2
 import os
+os.environ['SDL_AUDIODRIVER'] = 'dummy'
 import json
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import pygame
 from abc import ABC, abstractmethod
+import threading
 
 MUSIC_DIR = "MusicDir"
 STATE_FILE = "state.json"
@@ -14,55 +16,129 @@ if not os.path.exists(MUSIC_DIR):
 
 pygame.mixer.init()
 
+
 class MusicComponent(ABC):
-    def __init__(self, name):
+    def __init__(self, name:str):
         self._name = name
-
     @abstractmethod
-    def play(self):
+    def play(self)->None:
         pass
-
     @abstractmethod
-    def stop(self):
+    def stop(self)->None:
         pass
-
     @abstractmethod
-    def get_length(self):
+    def show(self)->None:
         pass
-
+    @property
     @abstractmethod
-    def show(self):
+    def length(self)->float:
         pass
-
+    @property
     @abstractmethod
-    def get_elements(self):
+    def elements(self)->list:
+        pass
+    @property
+    @abstractmethod
+    def file_name(self)->str:
         pass
 
 class Song(MusicComponent):
-    def __init__(self, name):
+    def __init__(self, name:str):
         super().__init__(name)
-
-    def play(self):
-        path = os.path.join(MUSIC_DIR, self._name)
+    def play(self)->None:
+        nom_arxiu = '.'.join([self._name, 'mp3'])
+        path = os.path.join(MUSIC_DIR, nom_arxiu)
         if os.path.exists(path):
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
         else:
-            print(f"Error: No s'ha trobat el fitxer {self._name}")
-
-    def stop(self):
+            print(f"Error: No s'ha trobat el fitxer {nom_arxiu}")
+    def stop(self)->None:
         pygame.mixer.music.stop()
-
-    def show(self):
-        print(f"Cançó: {self._name}")
-
-    def get_elements(self):
+    def show(self)->None:
+        print(f"{self._name}")
+    @property
+    def length(self)->float:
+        return 1.0
+    @property
+    def elements(self):
         return [self._name]
+    @property
+    def file_name(self)->str:
+        return '.'.join([self._name, 'mp3'])
 
 class PlayList(MusicComponent):
-    def __init__(self, name):
+    # Creem un esdeveniment per quan una canco acaba
+    _FINAL_CANCO = pygame.USEREVENT + 1
+    pygame.mixer.music.set_endevent(_FINAL_CANCO)
+
+    def __init__(self, name:str):
         super().__init__(name)
         self._components = []
+        # Llista de totes les cancos dintre la playlist (descomposant les altres playlist)
+        self._a_reproduir = []
+        # Indicadors de l'estat de la playlist
+        self._reproduint = False
+        self._pausat = False
+        # Index de la canco que s'esta reproduint (a self._a_reproduir)
+        self._index_reproduint = 0
+
+    def play(self)->None:
+        # Si ja estem reproduint no fem res
+        if (self._reproduint): return
+        if (self._pausat): 
+            self.resume()
+            return
+        # Obtenim una llista amb totes les cancons a reproduir
+        self._a_reproduir = self.components
+        if not self._a_reproduir:
+            print("La llista es buida")
+            return
+        self._reproduint = True
+        self._index_reproduint = 0
+        self._a_reproduir[self._index_reproduint].play()
+        threading.Thread(target=self.song_ended, daemon=True).start()
+
+    def stop(self)->None:
+        pygame.mixer.music.stop()
+        self._reproduint = False
+        self._pausat = False
+        self._a_reproduir.clear()
+        self._index_reproduint = 0
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+
+    def pause(self)->None:
+        pygame.mixer.music.pause()
+        self._pausat = True
+
+    def resume(self)->None:
+        pygame.mixer.music.unpause()
+        self._pausat = False
+
+    def song_ended(self):
+        while self._reproduint:
+            event = pygame.event.wait()
+            if event.type == self._FINAL_CANCO:
+                self.next()
+
+    def next(self)->None:
+        if pygame.mixer.music.get_busy():
+            # Parem la canco actual
+            pygame.mixer.music.stop()
+        self._index_reproduint += 1
+        if self._index_reproduint >= len(self._a_reproduir):
+            self.stop()
+            return
+        self._a_reproduir[self._index_reproduint].play()
+
+    def previous(self)->None:
+        if pygame.mixer.music.get_busy():
+            # Parem la canco actual
+            pygame.mixer.music.stop()
+        if self._index_reproduint == 0:
+            return
+        self._index_reproduint -= 1
+        self._a_reproduir[self._index_reproduint].play()
 
     def Add(self, element: MusicComponent):
         self._components.append(element)
@@ -70,7 +146,7 @@ class PlayList(MusicComponent):
     def remove_element(self, element: MusicComponent):
         if element in self._components:
             self._components.remove(element)
-
+        
     def show(self):
         print(f"{self._name}")
         for comp in self._components:
@@ -82,150 +158,167 @@ class PlayList(MusicComponent):
         with open(path, 'w') as f:
             for comp in self._components:
                 f.write(comp.name + '\n')
-
-    def get_elements(self):
+    @property
+    def length(self)->float:
+        suma = 0
+        for element in self.elements:
+            suma += element.length()
+        return suma
+    @property
+    def elements(self):
         elements = []
         for comp in self._components:
-            elements.extend(comp.get_elements())
+            elements.extend(comp.elements())
         return elements
-
     @property
     def components(self):
-        return self._components
+        components = []
+        for comp in self._components:
+            if type(comp) == Song:
+                components.extend([comp])
+            elif type(comp) == PlayList:
+                components.extend(comp.components)
+        return components
+    @property
+    def file_name(self):
+        return '.'.join([self._name, 'm3u'])
 
 class Reproductor:
     def __init__(self):
         self._main_list = PlayList("MainList")
         self.update_state()
+    def play(self):
+        self._main_list.play()
 
-    def add(self, element: MusicComponent):
+    def stop(self):
+        self._main_list.stop()
+
+    def pause(self)->None:
+        self._main_list.pause()
+
+    def resume(self)->None:
+        self._main_list.resume()
+
+    def next(self)->None:
+        self._main_list.next()
+
+    def previous(self)->None:
+        self._main_list.previous()
+
+    def add(self, element: MusicComponent)->None:
         self._main_list.Add(element)
 
-    def remove(self, element: MusicComponent):
+    def remove(self, element: MusicComponent)->None:
         self._main_list.remove_element(element)
 
-    def get_all_songs_to_play(self):
-        return self._main_list.get_elements()
-
-    def stop(self):
-        pygame.mixer.music.stop()
-
-    def save_state(self):
-        elements_names = [comp.name for comp in self._main_list.components]
-        with open(STATE_FILE, 'w') as f:
-            json.dump(elements_names, f)
-
-    def update_state(self):
+    def save_state(self)->None:
+        files_names = [comp.file_name for comp in self._main_list.components]
+        with open(STATE_FILE, 'w') as state_file:
+            json.dump(files_names, state_file)
+    def update_state(self)->None:
         if os.path.exists(STATE_FILE):
-            with open(STATE_FILE, 'r') as f:
+            with open(STATE_FILE, 'r') as state_file:
                 try:
-                    elements_names = json.load(f)
-                    for name in elements_names:
-                        if name.endswith('.mp3'):
+                    files_names = json.load(state_file)
+                    for name in files_names:
+                        if name[-4:] == '.mp3':
                             self.add(Song(name))
-                        elif name.endswith('.m3u'):
-                            self.add(self._load_playlist_from_file(name))
+                        elif name[-4:] == '.m3u':
+                            self.add(self.create_playlist_from_file(name))
                 except json.JSONDecodeError:
                     pass
-
-    def _load_playlist_from_file(self, filename):
-        pl = PlayList(filename)
+    def create_playlist_from_file(self, filename:str)->PlayList:
+        # El nom de la playlist es el nom de l'arxiu menys '.m3u'
+        pl = PlayList(filename[:-4])
+        # El filename passat ja te l'extensio .m3u
         path = os.path.join(MUSIC_DIR, filename)
+        # comprovem si existeix l'arxiu i afejim cada element a la llista 
         if os.path.exists(path):
-            with open(path, 'r') as f:
-                lines = f.read().splitlines()
+            with open(path, 'r') as pl_file:
+                lines = pl_file.read().splitlines()
                 for line in lines:
-                    if line.endswith('.mp3'):
-                        pl.Add(Song(line))
-                    elif line.endswith('.m3u'):
-                        pl.Add(self._load_playlist_from_file(line))
+                    if line[-4:] == '.mp3':
+                        # Afegim la canço sense l'extensio
+                        pl.Add(Song(line[:-4]))
+                    elif line[-4:] == '.m3u':
+                        pl.Add(self.create_playlist_from_file(line))
         return pl
-
+    @property
+    def songs_to_play(self)->list:
+        return self._main_list.elements
+    @property
+    def components_llista(self)->list:
+        return self._main_list.components
 
 class Controller:
-    def __init__(self, reproductor, view):
-        self.reproductor = reproductor
-        self.view = view
+    def __init__(self, reproductor, view)->None:
+        self._reproductor = reproductor
+        self._view = view
         
-        self.playlist_queue = []
-        self.is_playing = False
-
-    def add_song(self, song_name):
+    def add_song(self, song_name:str)->None:
+        # Creem la instancia de la canço i l'afegim
         song = Song(song_name)
-        self.reproductor.add(song)
-        self.view.show_reproductor()
+        self._reproductor.add(song)
+        self._view.show_reproductor()
 
-    def add_playlist(self, playlist_name):
-        pl = self.reproductor._load_playlist_from_file(playlist_name)
-        self.reproductor.add(pl)
-        self.view.show_reproductor()
+    def add_playlist(self, playlist_name:str)->None:
+        # Creem la instancia de la playlist i l'afegim
+        pl = self._reproductor.create_playlist_from_file(playlist_name)
+        self._reproductor.add(pl)
+        self._view.show_reproductor()
 
-    def remove_element(self, index):
-        if 0 <= index < len(self.reproductor.main_list.components):
-            element = self.reproductor.main_list.components[index]
-            self.reproductor.remove(element)
-            self.view.show_reproductor()
+    def remove_element(self, index)->None:
+        if 0 <= index < len(self._reproductor.main_list.components):
+            element = self._reproductor.main_list.components[index]
+            self._reproductor.remove(element)
+            self._view.show_reproductor()
 
-    def create_playlist(self, name, selected_files):
-        if not name.endswith('.m3u'):
-            name += '.m3u'
+    def create_playlist(self, name:str, selected_files:list):
         new_pl = PlayList(name)
         for file in selected_files:
-            if file.endswith('.mp3'):
+            if file[-4:] == '.mp3':
                 new_pl.Add(Song(file))
-            elif file.endswith('.m3u'):
-                new_pl.Add(self.reproductor._load_playlist_from_file(file))
+            elif file[-4:] == '.m3u':
+                new_pl.Add(self._reproductor.create_playlist_from_file(file))
         new_pl.save_to_file()
-        self.view.show_dir()
+        self._view.show_dir()
 
     def play(self):
-        self.playlist_queue = self.reproductor.get_all_songs_to_play()
-        if not self.playlist_queue:
-            messagebox.showinfo("Avís", "No hi ha cançons per reproduir.")
-            return
-        
-        self.is_playing = True
-        self._play_next()
-
-    def _play_next(self):
-        if self.playlist_queue and self.is_playing:
-            next_song = self.playlist_queue.pop(0)
-            path = os.path.join(MUSIC_DIR, next_song)
-            if os.path.exists(path):
-                pygame.mixer.music.load(path)
-                pygame.mixer.music.play()
-                self._check_music_end()
-            else:
-                self._play_next() 
-        else:
-            self.is_playing = False
-
-    def _check_music_end(self):
-        if self.is_playing:
-            if not pygame.mixer.music.get_busy():
-                self._play_next()
-            else:
-                self.view.root.after(1000, self._check_music_end)
+        self._reproductor.play()
 
     def stop(self):
-        self.is_playing = False
-        self.playlist_queue = []
-        self.reproductor.stop()
+        self._reproductor.stop()
+
+    def pause(self)->None:
+        self._reproductor.pause()
+
+    def resume(self)->None:
+        self._reproductor.resume()
+
+    def next(self)->None:
+        self._reproductor.next()
+
+    def previous(self)->None:
+        self._reproductor.previous()
 
     def exit(self):
         self.stop()
-        self.reproductor.save_state()
-        self.view.root.destroy()
+        self._reproductor.save_state()
+        self._view.destroy()
+
+    @property
+    def components_llista_reproductor(self):
+        return self._reproductor.components_llista
 
 
 class View:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Reproductor de Música - MATCAD")
-        self.root.geometry("500x500")
-        self.controller = None
+    def __init__(self, root, reproductor:Reproductor):
+        self._root = root
+        self._root.title("Reproductor de Música - MATCAD")
+        self._root.geometry("500x500")
+        self._controller = Controller(reproductor, self)
 
-        frame_lists = tk.Frame(root)
+        frame_lists = tk.Frame(self._root)
         frame_lists.pack(fill=tk.BOTH, expand=True, padx=10)
 
         frame_dir = tk.Frame(frame_lists)
@@ -240,30 +333,29 @@ class View:
         self.listbox_rep = tk.Listbox(frame_rep)
         self.listbox_rep.pack(fill=tk.BOTH, expand=True)
 
-        frame_btns = tk.Frame(root)
+        frame_btns = tk.Frame(self._root)
         frame_btns.pack(fill=tk.X, pady=10)
 
         tk.Button(frame_btns, text="1/2. Afegir al Reproductor", command=self.add).grid(row=0, column=0, padx=5, pady=5)
         tk.Button(frame_btns, text="3. Eliminar del Reproductor", command=self.remove).grid(row=0, column=1, padx=5, pady=5)
         tk.Button(frame_btns, text="4. Crear Llista (.m3u)", command=self.create_playlist).grid(row=1, column=0, padx=5, pady=5)
-        tk.Button(frame_btns, text="5. Reproduir", command=self.play, bg="lightgreen").grid(row=1, column=1, padx=5, pady=5)
-        tk.Button(frame_btns, text="Aturar", command=self.stop, bg="lightcoral").grid(row=2, column=0, padx=5, pady=5)
-        tk.Button(frame_btns, text="Sortir i Guardar Estat", command=self.exit).grid(row=2, column=1, padx=5, pady=5)
-
-    def set_controller(self, controller):
-        self.controller = controller
-        self.show_dir()
-        self.show_reproductor()
+        tk.Button(frame_btns, text="5. Play", command=self.play, bg="lightgreen").grid(row=2, column=0, padx=5, pady=5)
+        tk.Button(frame_btns, text="Stop", command=self.stop, bg="lightcoral").grid(row=2, column=1, padx=5, pady=5)
+        tk.Button(frame_btns, text="Pausa", command=self.pause).grid(row=3, column=0, padx=5, pady=5)
+        tk.Button(frame_btns, text="Resume", command=self.resume).grid(row=3, column=1, padx=5, pady=5)
+        tk.Button(frame_btns, text="Seguent", command=self.next).grid(row=4, column=0, padx=5, pady=5)
+        tk.Button(frame_btns, text="Anterior", command=self.previous).grid(row=4, column=1, padx=5, pady=5)
+        tk.Button(frame_btns, text="Sortir i Guardar Estat", command=self.exit).grid(row=5, column=0, padx=5, pady=5)
 
     def show_dir(self):
         self.listbox_dir.delete(0, tk.END)
         for f in os.listdir(MUSIC_DIR):
-            if f.endswith('.mp3') or f.endswith('.m3u'):
+            if f[-4:] == '.mp3' or f[-4:] == '.m3u':
                 self.listbox_dir.insert(tk.END, f)
 
     def show_reproductor(self):
         self.listbox_rep.delete(0, tk.END)
-        for comp in self.controller.reproductor.main_list.components:
+        for comp in self._controller.components_llista_reproductor:
             self.listbox_rep.insert(tk.END, comp.name)
 
 
@@ -272,14 +364,14 @@ class View:
         for idx in selected_indices:
             filename = self.listbox_dir.get(idx)
             if filename.endswith('.mp3'):
-                self.controller.add_song(filename)
+                self._controller.add_song(filename)
             elif filename.endswith('.m3u'):
-                self.controller.add_playlist(filename)
+                self._controller.add_playlist(filename)
 
     def remove(self):
         selected_indices = self.listbox_rep.curselection()
         if selected_indices:
-            self.controller.remove_element(selected_indices[0])
+            self._controller.remove_element(selected_indices[0])
 
     def create_playlist(self):
         selected_indices = self.listbox_dir.curselection()
@@ -290,24 +382,36 @@ class View:
         name = simpledialog.askstring("Nova Llista", "Introdueix el nom de la llista :")
         if name:
             selected_files = [self.listbox_dir.get(i) for i in selected_indices]
-            self.controller.create_playlist(name, selected_files)
+            self._controller.create_playlist(name, selected_files)
 
-    def play(self):
-        self.controller.play()
+    def play(self)->None:
+        self._controller.play()
 
-    def stop(self):
-        self.controller.stop()
+    def stop(self)->None:
+        self._controller.stop()
 
-    def exit(self):
-        self.controller.exit()
+    def pause(self)->None:
+        self._controller.pause()
+
+    def resume(self)->None:
+        self._controller.resume()
+
+    def next(self)->None:
+        self._controller.next()
+
+    def previous(self)->None:
+        self._controller.previous()
+
+    def exit(self)->None:
+        self._controller.exit()
+    
+    def destroy(self)->None:
+        self._root.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()
-    
     reproductor = Reproductor()
-    view = View(root)
-    controller = Controller(reproductor, view)
-    view.set_controller(controller)
+    view = View(root, reproductor)
     
     root.protocol("WM_DELETE_WINDOW", view.exit)
     root.mainloop()
