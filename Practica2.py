@@ -97,7 +97,7 @@ class PlayList(MusicComponent):
             self.resume()
             return
         # Obtenim una llista amb totes les cancons a reproduir
-        self._a_reproduir = self.elements
+        self._a_reproduir = self.get_all_songs()
         if not self._a_reproduir:
             print("La llista es buida")
             return
@@ -130,8 +130,10 @@ class PlayList(MusicComponent):
 
     def next(self)->None:
         if pygame.mixer.music.get_busy():
+            pygame.mixer.music.set_endevent(0)
             # Parem la canco actual
             pygame.mixer.music.stop()
+            pygame.mixer.music.set_endevent(self._FINAL_CANCO)
         self._index_reproduint += 1
         if self._index_reproduint >= len(self._a_reproduir):
             self.stop()
@@ -141,8 +143,10 @@ class PlayList(MusicComponent):
 
     def previous(self)->None:
         if pygame.mixer.music.get_busy():
+            pygame.mixer.music.set_endevent(0)
             # Parem la canco actual
             pygame.mixer.music.stop()
+            pygame.mixer.music.set_endevent(self._FINAL_CANCO)
         if self._index_reproduint == 0:
             return
         self._index_reproduint -= 1
@@ -166,28 +170,34 @@ class PlayList(MusicComponent):
         path = os.path.join(MUSIC_DIR, self.file_name)
         with open(path, 'w') as f:
             for comp in self._elements:
-                f.write(comp.name + '\n')
+                f.write(comp.file_name + '\n')
+    
+    def get_all_songs(self):
+        songs = []
+        for comp in self._elements:
+            if type(comp)==Song:
+                songs.append(comp)
+            elif type(comp) == PlayList:
+                songs.extend(comp.get_all_songs())
+        return songs
     @property
     def length(self)->float:
         suma = 0
         for component in self.elements:
-            suma += component.length()
+            suma += component.length
         return suma
     @property
     def elements(self):
-        elements = []
-        for comp in self._elements:
-            if type(comp) == Song:
-                elements.extend([comp])
-            elif type(comp) == PlayList:
-                elements.extend(comp.elements)
-        return elements
+        return self._elements
     @property
     def file_name(self):
         return '.'.join([self._name, 'm3u'])
     @property
     def num_elements(self):
         return len(self._elements)
+    @property
+    def name(self)->str:
+        return self._name
 class Reproductor:
     def __init__(self):
         self._main_list = PlayList("MainList")
@@ -228,7 +238,8 @@ class Reproductor:
                     files_names = json.load(state_file)
                     for name in files_names:
                         if name[-4:] == '.mp3':
-                            self.add(Song(name))
+                            # Traiem la extensio al instanciar Song
+                            self.add(Song(name[:-4]))
                         elif name[-4:] == '.m3u':
                             self.add(self.create_playlist_from_file(name))
                 except json.JSONDecodeError:
@@ -287,7 +298,7 @@ class Controller:
         new_pl = PlayList(name)
         for file in selected_files:
             if file[-4:] == '.mp3':
-                new_pl.Add(Song(file))
+                new_pl.Add(Song(file[:-4]))
             elif file[-4:] == '.m3u':
                 new_pl.Add(self._reproductor.create_playlist_from_file(file))
         new_pl.save_to_file()
@@ -379,8 +390,8 @@ class View:
                 # Traiem la extensio del string obtingut
                 self._controller.add_song(filename[:-4])
             elif filename.endswith('.m3u'):
-                # Traiem la extensio del string obtingut
-                self._controller.add_playlist(filename[:-4])
+                # No traiem la extensio del string perque el mètode create_playlist_from_file la necessita
+                self._controller.add_playlist(filename)
 
     def remove(self):
         selected_indices = self._listbox_rep.curselection()
@@ -395,7 +406,7 @@ class View:
         
         name = simpledialog.askstring("Nova Llista", "Introdueix el nom de la llista :")
         if name:
-            selected_files = [self._listbox_dir.get(i)[:-4] for i in selected_indices]
+            selected_files = [self._listbox_dir.get(i) for i in selected_indices]
             self._controller.create_playlist(name, selected_files)
 
     def play(self)->None:
