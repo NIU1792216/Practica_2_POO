@@ -99,6 +99,8 @@ class PlayList(MusicComponent):
         self._pausat = False
         # Index de la canco que s'esta reproduint (a self._a_reproduir)
         self._index_reproduint = 0
+        # Estrategia por defecto (secuencial)
+        self._strategy = sequentialPlayStrategy()
 
     def play(self)->None:
         # Si ja estem reproduint no fem res
@@ -165,10 +167,14 @@ class PlayList(MusicComponent):
 
     def Add(self, element: MusicComponent):
         self._elements.append(element)
+        if self._a_reproduir:
+            self._a_reproduir = self.get_all_songs()
 
     def remove_element(self, element: MusicComponent):
         if element in self._elements:
             self._elements.remove(element)
+            if self._a_reproduir:
+                self._a_reproduir = self.get_all_songs()
         
     def show(self):
         print(f"{self._name}")
@@ -184,12 +190,19 @@ class PlayList(MusicComponent):
     
     def get_all_songs(self):
         songs = []
-        for comp in self._elements:
+        # Ordenamos los elementos según la estrategia deseada
+        elements_ordenats = self._strategy.order(self._elements)
+        for comp in elements_ordenats:
             if type(comp)==Song:
                 songs.append(comp)
             elif type(comp) == PlayList:
                 songs.extend(comp.get_all_songs())
         return songs
+    # Método para cambiar la estrategia de reproducción
+    def set_strategy(self, strategy: PlayStrategy):
+        self._strategy = strategy
+        if self._a_reproduir:
+            self._a_reproduir = self.get_all_songs()
     @property
     def length(self)->float:
         suma = 0
