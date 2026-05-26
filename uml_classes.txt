@@ -5,78 +5,122 @@ MusicComponent <|-- PlayList
 PlayList "1" o-- "0..*" MusicComponent
 Reproductor "1" -- "1" Controller
 Controller "1" -- "1" View
+PlayList "1" o-- "1" PlayStrategy
+PlayStrategy <|-- sequentialPlayStrategy
+PlayStrategy <|-- randomPlayStrategy
+PlayStrategy <|-- ShortestFirstPlayStrategy
 
 class Controller{
-+ show_reproductor(): void
+- _reproductor: Reproductor
+- _view: View
++ add_song(song_name: str): void
++ add_playlist(playlist_name: str): void
++ remove_element(index: int): void
++ create_playlist(name: str, selected_files: list): void
 + play(): void
 + stop(): void 
 + pause(): void
 + resume(): void
 + next(): void
 + previous(): void
-+ add(element: MusicComponent): void
-+ remove(element: MusicComponent): void
 + exit(): void
++ set_strategy(strategy_type: str): void
++ elements_llista_reproductor(): list
 }
 
 class View{
-+ show_reproductor(): void
 + show_dir(): void
++ show_reproductor(): void
++ add(): void
++ remove(): void
++ create_playlist(): void
 + play(): void
 + stop(): void 
 + pause(): void
 + resume(): void
 + next(): void
 + previous(): void
-+ add(element: MusicComponent): void
-+ remove(element: MusicComponent): void
-+ create_PlayList(): void
 + exit(): void
++ change_strategy(selected_strategy: str): void
 }
 
 abstract class MusicComponent{
-- name: str
+- _name: str
 + play(): void
 + stop(): void
-+ get_length(): float
-+ get_name(): str
-+ get_file_name(): str
 + show(): void
++ length(): float
++ elements(): list
++ file_name(): str
 }
 
 class Song{
-- name: str
-+ show(): void
+- _name: str
 + play(): void
 + stop(): void
-+ get_length(): float
-+ get_file_name(): str
++ show(): void
++ name(): str
++ length(): float
++ elements(): list
++ file_name(): str
 }
 
 class PlayList{
-- name: str
-+ show(): void
-+ Add(element: MusicComponent): void
-+ remove_element(element: MusicComponent): void
+- _name: str
+- _elements: list
+- _strategy: PlayStrategy
 + play(): void
 + stop(): void 
 + pause(): void
 + resume(): void
++ song_ended(): void
 + next(): void
 + previous(): void
-+ song_ended(): void
++ Add(element: MusicComponent): void
++ remove_element(element: MusicComponent): void
++ show(): void
 + save_to_file(): void
-+ get_length(): float
-+ get_file_name(): str
++ get_all_songs(): list
++ set_strategy(strategy: PlayStrategy): void
++ length(): float
++ elements(): list
++ file_name(): str
++ num_elements(): int
++ name(): str
 }
 
 class Reproductor{
-- main_list: MusicComponent
+- _main_list: PlayList
 + play(): void
 + stop(): void
++ pause(): void
++ resume(): void
++ next(): void
++ previous(): void
 + add(element: MusicComponent): void
 + remove(element: MusicComponent): void
 + save_state(): void
 + update_state(): void
++ create_playlist_from_file(filename: str): PlayList
++ elements_llista(): list
++ num_elements(): int
++ elements(): list
++ set_strategy(strategy_type: str): void
+}
+
+abstract class PlayStrategy{
++ order(elements: list): list
+}
+
+class sequentialPlayStrategy {
++ order(elements: list): list
+}
+
+class randomPlayStrategy {
++ order(elements: list): list
+}
+
+class ShortestFirstPlayStrategy {
++ order(elements: list): list
 }
 @enduml
