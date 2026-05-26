@@ -53,6 +53,7 @@ class Song(MusicComponent):
             pygame.mixer.music.play()
         else:
             print(f"Error: No s'ha trobat el fitxer {nom_arxiu}")
+            raise NotADirectoryError
     def stop(self)->None:
         pygame.mixer.music.stop()
     def show(self)->None:
@@ -130,6 +131,7 @@ class PlayList(MusicComponent):
             self.stop()
             return
         self._a_reproduir[self._index_reproduint].play()
+        self._pausat = False
 
     def previous(self)->None:
         if pygame.mixer.music.get_busy():
@@ -139,6 +141,7 @@ class PlayList(MusicComponent):
             return
         self._index_reproduint -= 1
         self._a_reproduir[self._index_reproduint].play()
+        self._pausat = False
 
     def Add(self, element: MusicComponent):
         self._components.append(element)
