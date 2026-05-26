@@ -6,6 +6,7 @@ from tkinter import messagebox, simpledialog
 import pygame
 from abc import ABC, abstractmethod
 import threading
+import random
 
 MUSIC_DIR = "MusicDir"
 STATE_FILE = "state.json"
@@ -66,7 +67,16 @@ class Song(MusicComponent):
         return self._name
     @property
     def length(self)->float:
-        return 1.0
+        nom_arxiu = '.'.join([self._name, 'mp3'])
+        path = os.path.join(MUSIC_DIR, nom_arxiu)
+        if os.path.exists(path):
+            try:
+                so = pygame.mixer.Sound(path)
+                return so.get_length()
+            except Exception:
+                return 0.0   
+        else:
+            return 0.0
     @property
     def elements(self):
         return [self]
@@ -330,7 +340,22 @@ class Controller:
     def elements_llista_reproductor(self):
         return self._reproductor.elements_llista
 
+class PlayStrategy(ABC):
+    @abstractmethod
+    def order(self, elements:list)->list:
+        pass
 
+class sequentialPlayStrategy(PlayStrategy):
+    def order(self, elements:list)->list:
+        return elements
+    
+class randomPlayStrategy(PlayStrategy):
+    def order(self, elements:list)->list:
+        return random.sample(elements, len(elements))
+
+class ShortestFirstPlayStrategy(PlayStrategy):
+    def order(self, elements:list)->list:
+        return sorted(elements, key = lambda comp: comp.length)
 class View:
     def __init__(self, root, reproductor:Reproductor):
         self._root = root
