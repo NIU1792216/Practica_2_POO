@@ -25,10 +25,11 @@ class Controller{
 + previous(): void
 + exit(): void
 + set_strategy(strategy_type: str): void
-+ elements_llista_reproductor(): list
++ get_elements_llista_reproductor(): list
 }
 
 class View{
+- _controller: Controller
 + show_dir(): void
 + show_reproductor(): void
 + add(): void
@@ -49,9 +50,9 @@ abstract class MusicComponent{
 + play(): void
 + stop(): void
 + show(): void
-+ length(): float
-+ elements(): list
-+ file_name(): str
++ get_length(): float
++ get_elements(): list
++ get_file_name(): str
 }
 
 class Song{
@@ -59,10 +60,10 @@ class Song{
 + play(): void
 + stop(): void
 + show(): void
-+ name(): str
-+ length(): float
-+ elements(): list
-+ file_name(): str
++ get_name(): str
++ get_length(): float
++ get_elements(): list
++ get_file_name(): str
 }
 
 class PlayList{
@@ -82,11 +83,11 @@ class PlayList{
 + save_to_file(): void
 + get_all_songs(): list
 + set_strategy(strategy: PlayStrategy): void
-+ length(): float
-+ elements(): list
-+ file_name(): str
-+ num_elements(): int
-+ name(): str
++ get_length(): float
++ get_elements(): list
++ get_file_name(): str
++ get_num_elements(): int
++ get_name(): str
 }
 
 class Reproductor{
@@ -102,9 +103,9 @@ class Reproductor{
 + save_state(): void
 + update_state(): void
 + create_playlist_from_file(filename: str): PlayList
-+ elements_llista(): list
-+ num_elements(): int
-+ elements(): list
++ get_elements_llista(): list
++ get_num_elements(): int
++ get_elements(): list
 + set_strategy(strategy_type: str): void
 }
 
